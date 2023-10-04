@@ -1,5 +1,10 @@
 package com.example.plugins_webview;
 
+import android.annotation.SuppressLint;
+import android.app.Activity;
+import android.content.ClipData;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.*;
 import android.widget.Toast;
@@ -9,30 +14,31 @@ import android.Manifest;
 import android.content.pm.PackageManager;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
     private static final int CAMERA_AND_MICROPHONE_PERMISSION_CODE = 1;
-
+    private static final int FILE_CHOOSER_REQUEST_CODE = 2; // Número de solicitud para la selección de archivos
+    private ValueCallback<Uri[]> mUploadMessage; // Para gestionar la carga de archivos
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // setContentView(R.layout.activity_main);
         setContentView(R.layout.activity_main);
-
         WebView.setWebContentsDebuggingEnabled(true);
         webView = findViewById(R.id.webview);
 
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true); // Habilitar JavaScript en el WebView
+        webSettings.setAllowFileAccess(true);
         webSettings.setMediaPlaybackRequiresUserGesture(false); // Permitir la reproducción de medios sin interacción del usuario
 
-        // Configurar un WebChromeClient para manejar las solicitudes de acceso a la cámara y al micrófono
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
+                // Configurar un WebChromeClient para manejar las solicitudes de acceso a la cámara y al micrófono
                 if (checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
                         checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
                     request.grant(request.getResources());
@@ -41,12 +47,51 @@ public class MainActivity extends AppCompatActivity {
                     requestCameraAndMicrophonePermission();
                 }
             }
+
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams) {
+                // Configurar un WebChromeClient para manejar las solicitudes de archivos
+                Intent intent = fileChooserParams.createIntent();
+                intent.setType("*/*");
+                String[] mimeTypes = {"image/jpeg", "image/png", "application/pdf"};
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, mimeTypes);
+                mUploadMessage = filePathCallback;
+                startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
+                return true;
+            }
         });
 
         webView.setWebViewClient(new WebViewClient()); // Controla la navegación en el WebView
 
         // Cargar la URL del sitio web que deseas mostrar en el WebView
         webView.loadUrl("https://www.example.com");
+    }
+
+    // Manejo de resultados de archivos
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent intent) {
+        super.onActivityResult(requestCode, resultCode, intent);
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (mUploadMessage == null) return;
+            Uri[] results = null;
+            if (resultCode == Activity.RESULT_OK) {
+                if (intent != null) {
+                    String dataString = intent.getDataString();
+                    ClipData clipData = intent.getClipData();
+                    if (clipData != null) {
+                        results = new Uri[clipData.getItemCount()];
+                        for (int i = 0; i < clipData.getItemCount(); i++) {
+                            ClipData.Item item = clipData.getItemAt(i);
+                            results[i] = item.getUri();
+                        }
+                    }
+                    if (dataString != null)
+                        results = new Uri[]{Uri.parse(dataString)};
+                }
+            }
+            mUploadMessage.onReceiveValue(results);
+            mUploadMessage = null;
+        }
     }
 
     private void requestCameraAndMicrophonePermission() {
