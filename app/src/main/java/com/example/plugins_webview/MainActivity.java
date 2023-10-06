@@ -35,6 +35,18 @@ public class MainActivity extends AppCompatActivity {
         webSettings.setAllowFileAccess(true);
         webSettings.setMediaPlaybackRequiresUserGesture(false); // Permitir la reproducción de medios sin interacción del usuario
 
+        webView.setDownloadListener(new DownloadListener() {
+            // Aquí puedes implementar cómo deseas manejar las descargas.
+            @Override
+            public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimetype, long contentLength) {
+                // Por ejemplo, puedes abrir un navegador externo para la descarga.
+                Intent intent = new Intent(Intent.ACTION_VIEW);
+                intent.setData(Uri.parse(url));
+                startActivity(intent);
+
+            }
+        });
+        
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
